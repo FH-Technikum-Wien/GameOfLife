@@ -9,6 +9,8 @@
 #define ALIVE 'x'
 #define DEAD '.'
 
+static const bool RULE_TABLE[2][9]{ {0,0,0,1,0,0,0,0,0},{0,0,1,1,0,0,0,0,0} };
+
 enum class ArgumentType
 {
 	LOAD, SAVE, GENERATIONS, MEASURE, HELP
@@ -39,7 +41,6 @@ void showHelp();
 
 bool** runGenerations(unsigned int width, unsigned int height, unsigned int generations);
 int getNeighborsAlive(bool** world, int x, int y, unsigned int width, unsigned int height);
-bool checkIsAlive(bool selfAlive, unsigned int neighborsAlive);
 
 int main(int argc, char* argv[])
 {
@@ -197,17 +198,17 @@ bool** runGenerations(unsigned int width, unsigned int height, unsigned int gene
 		for (unsigned int x = 0; x < width; x++)
 		{
 			neighborsAlive = getNeighborsAlive(world, x, 0, width, height);
-			newWorld[0][x] = checkIsAlive(world[0][x], neighborsAlive);
+			newWorld[0][x] = RULE_TABLE[world[0][x]][neighborsAlive];
 			neighborsAlive = getNeighborsAlive(world, x, height - 1, width, height);
-			newWorld[height - 1][x] = checkIsAlive(world[height - 1][x], neighborsAlive);
+			newWorld[height - 1][x] = RULE_TABLE[world[height - 1][x]][neighborsAlive];
 		}
 		// Left and right
 		for (unsigned int y = 1; y < height - 1; y++)
 		{
 			neighborsAlive = getNeighborsAlive(world, 0, y, width, height);
-			newWorld[y][0] = checkIsAlive(world[y][0], neighborsAlive);
+			newWorld[y][0] = RULE_TABLE[world[y][0]][neighborsAlive];
 			neighborsAlive = getNeighborsAlive(world, width - 1, y, width, height);
-			newWorld[y][width - 1] = checkIsAlive(world[y][width - 1], neighborsAlive);
+			newWorld[y][width - 1] = RULE_TABLE[world[y][width - 1]][neighborsAlive];
 		}
 
 		// Calculate inside
@@ -216,18 +217,17 @@ bool** runGenerations(unsigned int width, unsigned int height, unsigned int gene
 			for (unsigned int x = 1; x < width - 1; x++)
 			{
 				// Check neighnors.
-				int numberOfAlives =
+				neighborsAlive =
 					world[y - 1][x - 1] +	// Top left
-					world[y - 1][x] +	// Top middle 
+					world[y - 1][x] +		// Top middle 
 					world[y - 1][x + 1] +	// Top right
-					world[y][x - 1] +	// Left
-					world[y][x + 1] +	// Right
+					world[y][x - 1] +		// Left
+					world[y][x + 1] +		// Right
 					world[y + 1][x - 1] +	// Bottom left
-					world[y + 1][x] +	// Bottom middle
+					world[y + 1][x] +		// Bottom middle
 					world[y + 1][x + 1];	// Bottom right
 
-				bool isAlive = world[y][x];
-				newWorld[y][x] = checkIsAlive(isAlive, numberOfAlives);
+				newWorld[y][x] = RULE_TABLE[world[y][x]][neighborsAlive];
 			}
 		}
 		temp = world;
@@ -259,16 +259,3 @@ int getNeighborsAlive(bool** world, int x, int y, unsigned int width, unsigned i
 	}
 	return alive;
 }
-
-bool checkIsAlive(bool selfAlive, unsigned int neighborsAlive)
-{
-	// If three bring to life or stays alive.
-	if (!selfAlive && neighborsAlive == 3)
-		return true;
-	// If less than two or more than 3 die
-	else if ((selfAlive && neighborsAlive < 2) || (selfAlive && neighborsAlive > 3))
-		return false;
-	else
-		return selfAlive;
-}
-
