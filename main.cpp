@@ -22,17 +22,24 @@ std::map<std::string, ArgumentType> argumentMap{
 	{"--measure", ArgumentType::HELP},
 };
 
-std::string InputFile = "in.gol";
+std::string InputFile = "random10000_in.gol";
 std::string OutputFile = "out.gol";
-unsigned int Generations = 1;
-bool ShowMeasurements = false;
+
+unsigned int Generations = 250;
+bool ShowMeasurements = true;
+
+bool** world;
+bool** temp;
+bool** newWorld;
 
 
 void processArgs(int argc, char* argv[]);
 void showWrongArgs();
 void showHelp();
 
-bool* runGenerations(bool* world, unsigned int width, unsigned int height, unsigned int generations);
+bool** runGenerations(unsigned int width, unsigned int height, unsigned int generations);
+int getNeighborsAlive(bool** world, int x, int y, unsigned int width, unsigned int height);
+bool checkIsAlive(bool selfAlive, unsigned int neighborsAlive);
 
 int main(int argc, char* argv[])
 {
@@ -49,7 +56,8 @@ int main(int argc, char* argv[])
 	// Read file.
 	std::ifstream input;
 	input.open(InputFile);
-	if (!input.is_open()) {
+	if (!input.is_open())
+	{
 		std::cerr << "COULD NOT OPEN INPUT-FILE. WRONG PATH?" << std::endl;
 		return 1;
 	}
@@ -62,16 +70,24 @@ int main(int argc, char* argv[])
 	unsigned int height = std::stoi(rows);
 	unsigned int worldSize = width * height;
 
-	// Convert file to bool-array.
-	bool* world = new bool[worldSize];
-	unsigned int index = 0;
-	char cell;
-	while (input.get(cell) && index < worldSize)
+	// Create arrays
+	world = new bool* [height];
+	newWorld = new bool* [height];
+	for (unsigned int i = 0; i < height; i++)
 	{
-		if (cell != ALIVE && cell != DEAD)
-			continue;
-		world[index] = cell == ALIVE;
-		index++;
+		world[i] = new bool[width];
+		newWorld[i] = new bool[width];
+	}
+
+	// Convert file to bool-array.
+	for (unsigned int y = 0; y < height; y++)
+	{
+		std::string line;
+		std::getline(input, line);
+		for (unsigned int x = 0; x < width; x++)
+		{
+			world[y][x] = line[x] == ALIVE;
+		}
 	}
 	input.close();
 
@@ -82,7 +98,7 @@ int main(int argc, char* argv[])
 	time->startComputation();
 
 	// Go through all generations.
-	bool* result = runGenerations(world, width, height, Generations);
+	bool** result = runGenerations(width, height, Generations);
 
 	time->stopComputation();
 	//----------------------------------------------------------------------------------------------------
@@ -94,13 +110,14 @@ int main(int argc, char* argv[])
 	std::ofstream output;
 	output.open(OutputFile, std::ios::out | std::ios::trunc);
 	output << width << "," << height << std::endl;
-	for (unsigned int i = 0; i < worldSize; i++)
+	for (unsigned int y = 0; y < height; y++)
 	{
-		char alive = result[i] ? ALIVE : DEAD;
-		output << alive;
-		// New line after 'width' is reached.
-		if ((i + 1) % width == 0 && i + 1 < worldSize)
-			output << std::endl;
+		for (unsigned int x = 0; x < width; x++)
+		{
+			char alive = result[y][x] ? ALIVE : DEAD;
+			output << alive;
+		}
+		output << std::endl;
 	}
 	output.close();
 	time->stopFinalization();
@@ -169,53 +186,89 @@ void showHelp()
 	std::cout << "--measure \t\t\t-> Whether to print out time measurements." << std::endl;
 }
 
-bool* runGenerations(bool* world, unsigned int width, unsigned int height, unsigned int generations)
+bool** runGenerations(unsigned int width, unsigned int height, unsigned int generations)
 {
-	unsigned int worldSize = width * height;
-	bool* newWorld = new bool[worldSize];
+	// Calculate inner field
 	for (unsigned int i = 0; i < generations; i++)
 	{
-		for (unsigned int y = 0; y < height; y++)
+		// Calculate border
+		// Top and bottom
+		int neighborsAlive = 0;
+		for (unsigned int x = 0; x < width; x++)
 		{
-			for (unsigned int x = 0; x < width; x++)
+			neighborsAlive = getNeighborsAlive(world, x, 0, width, height);
+			newWorld[0][x] = checkIsAlive(world[0][x], neighborsAlive);
+			neighborsAlive = getNeighborsAlive(world, x, height - 1, width, height);
+			newWorld[height - 1][x] = checkIsAlive(world[height - 1][x], neighborsAlive);
+		}
+		// Left and right
+		for (unsigned int y = 1; y < height - 1; y++)
+		{
+			neighborsAlive = getNeighborsAlive(world, 0, y, width, height);
+			newWorld[y][0] = checkIsAlive(world[y][0], neighborsAlive);
+			neighborsAlive = getNeighborsAlive(world, width - 1, y, width, height);
+			newWorld[y][width - 1] = checkIsAlive(world[y][width - 1], neighborsAlive);
+		}
+
+		// Calculate inside
+		for (unsigned int y = 1; y < height - 1; y++)
+		{
+			for (unsigned int x = 1; x < width - 1; x++)
 			{
-				unsigned int cellIndex = (y * width) + x;
+				// Check neighnors.
+				int numberOfAlives =
+					world[y - 1][x - 1] +	// Top left
+					world[y - 1][x] +	// Top middle 
+					world[y - 1][x + 1] +	// Top right
+					world[y][x - 1] +	// Left
+					world[y][x + 1] +	// Right
+					world[y + 1][x - 1] +	// Bottom left
+					world[y + 1][x] +	// Bottom middle
+					world[y + 1][x + 1];	// Bottom right
 
-				// Check neighbors.
-				unsigned int numberOfAlive = 0;
-				for (int yOffset = -1; yOffset <= 1; yOffset++)
-				{
-					for (int xOffset = -1; xOffset <= 1; xOffset++)
-					{
-						// Skip self
-						if (yOffset == 0 && xOffset == 0)
-							continue;
-						// Wrap around.
-						int currentX = x + xOffset;
-						currentX = currentX == width ? 0 : currentX < 0 ? width - 1 : currentX;
-						int currentY = y + yOffset;
-						currentY = currentY == height ? 0 : currentY < 0 ? height - 1 : currentY;
-
-						unsigned int currentNeighbor = (currentY * width) + currentX;
-
-						if (world[currentNeighbor])
-							numberOfAlive++;
-					}
-				}
-				bool isAlive = world[cellIndex];
-				// If three bring to live or stays alive.
-				if (!isAlive && numberOfAlive == 3)
-					newWorld[cellIndex] = true;
-				// If less than two or more than 3 die
-				else if ((isAlive && numberOfAlive < 2) || (isAlive && numberOfAlive > 3))
-					newWorld[cellIndex] = false;
-				else
-					newWorld[cellIndex] = world[cellIndex];
+				bool isAlive = world[y][x];
+				newWorld[y][x] = checkIsAlive(isAlive, numberOfAlives);
 			}
 		}
-		delete[] world;
+		temp = world;
 		world = newWorld;
-		newWorld = new bool[worldSize];
+		newWorld = temp;
 	}
 	return world;
 }
+
+int getNeighborsAlive(bool** world, int x, int y, unsigned int width, unsigned int height)
+{
+	unsigned int alive = 0;
+	for (int yOffset = -1; yOffset <= 1; yOffset++)
+	{
+		for (int xOffset = -1; xOffset <= 1; xOffset++)
+		{
+			// Skip self
+			if (yOffset == 0 && xOffset == 0)
+				continue;
+			// Wrap around.
+			int currentX = x + xOffset;
+			currentX = currentX == width ? 0 : currentX < 0 ? width - 1 : currentX;
+			int currentY = y + yOffset;
+			currentY = currentY == height ? 0 : currentY < 0 ? height - 1 : currentY;
+
+			if (world[currentY][currentX])
+				alive++;
+		}
+	}
+	return alive;
+}
+
+bool checkIsAlive(bool selfAlive, unsigned int neighborsAlive)
+{
+	// If three bring to life or stays alive.
+	if (!selfAlive && neighborsAlive == 3)
+		return true;
+	// If less than two or more than 3 die
+	else if ((selfAlive && neighborsAlive < 2) || (selfAlive && neighborsAlive > 3))
+		return false;
+	else
+		return selfAlive;
+}
+
