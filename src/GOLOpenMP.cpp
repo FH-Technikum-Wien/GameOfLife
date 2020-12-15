@@ -6,8 +6,8 @@ constexpr bool RULE_TABLE[2][9]{ {0,0,0,1,0,0,0,0,0},{0,0,1,1,0,0,0,0,0} };
 
 bool** GOLOpenMP::runGenerations(bool** world, bool** newWorld, int width, int height, int generations)
 {
-	//omp_set_nested(true);
-	omp_set_dynamic(true);
+	omp_set_dynamic(1);
+	omp_set_num_threads(11);
 	bool** temp;
 	for (int i = 0; i < generations; i++)
 	{
