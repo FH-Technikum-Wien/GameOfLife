@@ -1,6 +1,5 @@
 #include "GOLOpenMP.h"
 #include <omp.h>
-#include <iostream>
 
 constexpr bool RULE_TABLE[2][9]{ {0,0,0,1,0,0,0,0,0},{0,0,1,1,0,0,0,0,0} };
 

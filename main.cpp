@@ -7,8 +7,7 @@
 #include "util/Timing.h"
 #include "src/GOLSingleThread.h"
 #include "src/GOLOpenMP.h"
-
-#include <omp.h>
+#include "src/GOLOpenCL.h"
 
 #define ALIVE 'x'
 #define DEAD '.'
@@ -74,6 +73,9 @@ int main(int argc, char* argv[])
 		newWorld[i] = new bool[width];
 	}
 
+	bool* world1D = new bool[worldSize];
+	bool* newWorld1D = new bool[worldSize];
+
 	// Convert file to bool-array.
 	for (unsigned int y = 0; y < height; y++)
 	{
@@ -82,9 +84,12 @@ int main(int argc, char* argv[])
 		for (unsigned int x = 0; x < width; x++)
 		{
 			world[y][x] = line[x] == ALIVE;
+			world1D[(y * width) + x] = line[x] == ALIVE;
 		}
 	}
 	input.close();
+
+	GOLOpenCL::setup(width, height);
 
 	time->stopSetup();
 	//----------------------------------------------------------------------------------------------------
@@ -94,7 +99,8 @@ int main(int argc, char* argv[])
 
 	// Go through all generations.
 	//bool** result = GOLSingleThread::runGenerations(world, newWorld, width, height, Generations);
-	bool** result = GOLOpenMP::runGenerations(world, newWorld, width, height, Generations);
+	//bool** result = GOLOpenMP::runGenerations(world, newWorld, width, height, Generations);	
+	bool* result1D = GOLOpenCL::runGenerations(world1D, newWorld1D, width, height, Generations);
 
 	time->stopComputation();
 	//----------------------------------------------------------------------------------------------------
@@ -110,7 +116,8 @@ int main(int argc, char* argv[])
 	{
 		for (unsigned int x = 0; x < width; x++)
 		{
-			char alive = result[y][x] ? ALIVE : DEAD;
+			//char alive = result[y][x] ? ALIVE : DEAD;
+			char alive = result1D[(y * width) + x] ? ALIVE : DEAD;
 			output << alive;
 		}
 		output << std::endl;

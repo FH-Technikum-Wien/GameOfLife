@@ -21,31 +21,32 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\GOLOpenCL.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\GOLOpenMP.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\GOLSingleThread.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\GOLOpenCL.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Data\in\random250_in.gol" />
     <None Include="in.gol" />
+    <None Include="kernel\gol_kernel.cl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="util\Timing.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\GOLOpenCL.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\GOLOpenMP.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\GOLSingleThread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\GOLOpenCL.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
