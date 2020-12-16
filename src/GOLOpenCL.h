@@ -3,8 +3,8 @@
 class GOLOpenCL
 {
 public:
-	static void setup(int width, int height);
+	static void setup(bool** world, bool** newWorld, int width, int height);
 
-	static bool* runGenerations(bool* world, bool* newWorld, int width, int height, int generations);
+	static bool** runGenerations(bool** world, bool** newWorld, int width, int height, int generations);
 };
 

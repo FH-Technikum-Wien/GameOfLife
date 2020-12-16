@@ -33,7 +33,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Data\in\random250_in.gol" />
-    <None Include="in.gol" />
     <None Include="kernel\gol_kernel.cl" />
   </ItemGroup>
   <ItemGroup>

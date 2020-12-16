@@ -1,12 +1,22 @@
 #include "GOLOpenMP.h"
 #include <omp.h>
+#include <iostream>
 
 constexpr bool RULE_TABLE[2][9]{ {0,0,0,1,0,0,0,0,0},{0,0,1,1,0,0,0,0,0} };
 
+void GOLOpenMP::setup(unsigned int numberOfThreads)
+{
+	// If threads defined, disable dynamic adjustment of number of threads.
+	if (numberOfThreads > 0) {
+		omp_set_dynamic(0);
+		omp_set_num_threads(numberOfThreads);
+	}
+	else
+		omp_set_dynamic(1);
+}
+
 bool** GOLOpenMP::runGenerations(bool** world, bool** newWorld, int width, int height, int generations)
 {
-	omp_set_dynamic(1);
-	omp_set_num_threads(11);
 	bool** temp;
 	for (int i = 0; i < generations; i++)
 	{

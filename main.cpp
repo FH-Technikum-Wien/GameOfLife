@@ -14,22 +14,49 @@
 
 enum class ArgumentType
 {
-	LOAD, SAVE, GENERATIONS, MEASURE, HELP
+	LOAD, SAVE, GENERATIONS, MEASURE, PRETTY, MODE, THREADS, HELP
 };
+
 
 std::map<std::string, ArgumentType> argumentMap{
 	{"--load", ArgumentType::LOAD},
 	{"--save", ArgumentType::SAVE},
 	{"--generations", ArgumentType::GENERATIONS},
 	{"--measure", ArgumentType::MEASURE},
-	{"--measure", ArgumentType::HELP},
+	{"--pretty", ArgumentType::PRETTY},
+	{"--mode", ArgumentType::MODE},
+	{"--threads", ArgumentType::THREADS},
+	{"--help", ArgumentType::HELP},
+};
+
+enum class ModeType
+{
+	SEQ, OMP, OCL
+};
+
+
+std::map<std::string, ModeType> modeMap{
+	{"seq", ModeType::SEQ},
+	{"omp", ModeType::OMP},
+	{"ocl", ModeType::OCL},
+};
+
+std::map<ModeType, std::string> modeNameMap{
+	{ModeType::SEQ, "Sequential"},
+	{ModeType::OMP, "OpenMP"},
+	{ModeType::OCL, "OpenCL"},
 };
 
 std::string InputFile = "random10000_in.gol";
 std::string OutputFile = "out.gol";
 
-unsigned int Generations = 250;
-bool ShowMeasurements = true;
+unsigned int generations = 250;
+bool showMeasurements = false;
+bool prettyPrint = false;
+
+ModeType mode = ModeType::SEQ;
+
+unsigned int numberOfThreads = 0;
 
 void processArgs(int argc, char* argv[]);
 void showWrongArgs();
@@ -39,7 +66,6 @@ int main(int argc, char* argv[])
 {
 	// Handle arguments.
 	processArgs(argc, argv);
-
 	Timing* time = Timing::getInstance();
 
 	//----------------------------------------------------------------------------------------------------
@@ -64,7 +90,6 @@ int main(int argc, char* argv[])
 	unsigned int height = std::stoi(rows);
 	unsigned int worldSize = width * height;
 
-	// Create arrays
 	bool** world = new bool* [height];
 	bool** newWorld = new bool* [height];
 	for (unsigned int i = 0; i < height; i++)
@@ -73,34 +98,47 @@ int main(int argc, char* argv[])
 		newWorld[i] = new bool[width];
 	}
 
-	bool* world1D = new bool[worldSize];
-	bool* newWorld1D = new bool[worldSize];
-
 	// Convert file to bool-array.
 	for (unsigned int y = 0; y < height; y++)
 	{
 		std::string line;
 		std::getline(input, line);
 		for (unsigned int x = 0; x < width; x++)
-		{
 			world[y][x] = line[x] == ALIVE;
-			world1D[(y * width) + x] = line[x] == ALIVE;
-		}
 	}
 	input.close();
 
-	GOLOpenCL::setup(width, height);
+	if (mode == ModeType::OMP)
+		GOLOpenMP::setup(numberOfThreads);
+
+	if (mode == ModeType::OCL)
+		GOLOpenCL::setup(world, newWorld, width, height);
 
 	time->stopSetup();
 	//----------------------------------------------------------------------------------------------------
 	// Calculation
 	//----------------------------------------------------------------------------------------------------
 	time->startComputation();
-
+	bool** result;
 	// Go through all generations.
-	//bool** result = GOLSingleThread::runGenerations(world, newWorld, width, height, Generations);
-	//bool** result = GOLOpenMP::runGenerations(world, newWorld, width, height, Generations);	
-	bool* result1D = GOLOpenCL::runGenerations(world1D, newWorld1D, width, height, Generations);
+
+	switch (mode)
+	{
+	case ModeType::SEQ:
+		result = GOLSingleThread::runGenerations(world, newWorld, width, height, generations);
+		break;
+	case ModeType::OMP:
+		result = GOLOpenMP::runGenerations(world, newWorld, width, height, generations);
+		break;
+		break;
+	case ModeType::OCL:
+		result = GOLOpenCL::runGenerations(world, newWorld, width, height, generations);
+		break;
+	default:
+		result = world;
+		std::cerr << "ERROR! Couldn't execute requested mode";
+		break;
+	}
 
 	time->stopComputation();
 	//----------------------------------------------------------------------------------------------------
@@ -116,8 +154,7 @@ int main(int argc, char* argv[])
 	{
 		for (unsigned int x = 0; x < width; x++)
 		{
-			//char alive = result[y][x] ? ALIVE : DEAD;
-			char alive = result1D[(y * width) + x] ? ALIVE : DEAD;
+			char alive = result[y][x] ? ALIVE : DEAD;
 			output << alive;
 		}
 		output << std::endl;
@@ -125,8 +162,11 @@ int main(int argc, char* argv[])
 	output.close();
 	time->stopFinalization();
 
-	if (showHelp)
+	if (prettyPrint)
 		time->print(true);
+
+	if (showMeasurements)
+		std::cout << time->getResults() << std::endl;
 
 	return 0;
 }
@@ -157,11 +197,26 @@ void processArgs(int argc, char* argv[])
 		case ArgumentType::GENERATIONS:
 			if (argData.empty())
 				showWrongArgs();
-			Generations = std::stoi(argData);
+			generations = std::stoi(argData);
 			i++;
 			break;
 		case ArgumentType::MEASURE:
-			ShowMeasurements = true;
+			showMeasurements = true;
+			break;
+		case ArgumentType::PRETTY:
+			prettyPrint = true;
+			break;
+		case ArgumentType::MODE:
+			if (argData.empty())
+				showWrongArgs();
+			mode = modeMap[argData];
+			i++;
+			break;
+		case ArgumentType::THREADS:
+			if (argData.empty())
+				showWrongArgs();
+			numberOfThreads = std::stoi(argData);
+			i++;
 			break;
 		case ArgumentType::HELP:
 			showHelp();
@@ -183,8 +238,13 @@ void showWrongArgs()
 
 void showHelp()
 {
-	std::cout << "--load <file> \t\t\t-> Filename to read from." << std::endl;
-	std::cout << "--save <file> \t\t\t-> Filename to save to." << std::endl;
-	std::cout << "--generations <number of generations> \t-> Number of generations to go through." << std::endl;
-	std::cout << "--measure \t\t\t-> Whether to print out time measurements." << std::endl;
+	std::cout << std::endl;
+	std::cout << "--load <file>                            -> Filename to read from." << std::endl;
+	std::cout << "--save <file>                            -> Filename to save to." << std::endl;
+	std::cout << "--generations <number of generations>    -> Number of generations to go through." << std::endl;
+	std::cout << "--measure                                -> Whether to print out time measurements." << std::endl;
+	std::cout << "--pretty                                 -> Whether to print out time pretty." << std::endl;
+	std::cout << "--mode <modeType>                        -> Choose between: seq | omp | ocl" << std::endl;
+	std::cout << "--threads <numberOfThreads>              -> Sets the threads used by OpenMP. If not set, uses all available." << std::endl;
+	std::cout << "--help                                   -> Prints out this message." << std::endl;
 }
